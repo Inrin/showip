@@ -5,6 +5,10 @@
 #include <netdb.h>
 #include <ifaddrs.h>
 
+/* IFF_LOOPBACK */
+#include <sys/ioctl.h>
+#include <net/if.h>
+
 #include <stdio.h>  /* printing */
 #include <stdlib.h> /* exit/EXIT_* */
 #include <string.h> /* strncmp */
@@ -76,6 +80,7 @@ static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
         /* Filter interfaces */
         if (
                 (ifa->ifa_addr == NULL) || 
+		(ifa->ifa_flags & IFF_LOOPBACK) ||
                 (strncmp(ifa->ifa_name, "lo", 3) == 0) ||
                 (options->interface[0] != '\0' && 
                  strncmp(ifa->ifa_name, options->interface, sizeof options->interface) != 0)
