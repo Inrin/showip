@@ -11,6 +11,8 @@ Current options/filters are:
 * **-6** display IPv6 addresses (Same as -glu)
 * **-g** display GUAs (Global Unicast Addresses)
 * **-l** display link local addresses
+* **-t** display temporary addresses
+* **-T** filter temporary addresses out
 * **-u** display ULAs (Unique Local addresses)
 * **interface** display results for *interface* only
 
