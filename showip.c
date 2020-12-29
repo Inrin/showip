@@ -5,15 +5,11 @@
 #include <netdb.h>
 #include <ifaddrs.h>
 
-/* IFF_LOOPBACK */
-#include <sys/ioctl.h>
-#include <net/if.h>
-
 #include <stdio.h>  /* printing */
 #include <stdlib.h> /* exit/EXIT_* */
 #include <string.h> /* strncmp */
 #include <errno.h>
-#include <ctype.h>
+#include <ctype.h> /* isspace */
 #include <stdbool.h>
 
 #define ADDRSIZE 32
@@ -31,7 +27,7 @@ enum ARGFLAGS {
 
 struct opts {
 	int flags;
-	/* Windows interface names can be up to 256. 
+	/* Windows interface names can be up to 256.
 	 * Linux differs between 16 and 256.
 	 */
 	char interface[256];
@@ -47,16 +43,16 @@ static void usage()
 static void help()
 {
 	puts(
-      "Usage: showip [-h] [-46gltTu] [interface]\n"
-      "    -h    show this help\n"
-      "    -4    print IPv4 addresses\n"
-      "    -6    print IPv6 addresses (same as -gltu)\n"
-      "    -g    print Global Unique Addresses (GUA)\n"
-      "    -l    print Link-Local Addresses (LLA)\n"
-      "    -t    print temporary addresses\n"
-      "    -T    filter temporary addresses out\n"
-      "    -u    print Unique Local Addresses (ULA)\n"
-      );
+		"Usage: showip [-h] [-46gltTu] [interface]\n"
+		"    -h    show this help\n"
+		"    -4    print IPv4 addresses\n"
+		"    -6    print IPv6 addresses (same as -gltu)\n"
+		"    -g    print Global Unique Addresses (GUA)\n"
+		"    -l    print Link-Local Addresses (LLA)\n"
+		"    -t    print temporary addresses\n"
+		"    -T    filter temporary addresses out\n"
+		"    -u    print Unique Local Addresses (ULA)\n"
+	);
 
 	exit(EXIT_SUCCESS);
 }
@@ -75,7 +71,7 @@ static struct opts *parse_flags(int argc, const char **argv)
 		if (*argv[i] == '-') {
 			for (const char *ch = argv[i]+1; *ch; ch++) {
 				switch (*ch) {
-          case 'h': help(); break; /* useless break but you never know */
+					case 'h': help(); break; /* useless break but you never know */
 					case '4': options->flags |= IPV4; break;
 					case '6': options->flags |= IPV6; break;
 					case 'g': options->flags |= GUA6; break;
@@ -108,7 +104,7 @@ static char *reduce_v6(char *addr)
 	/* Special case of first quartet */
 	if (addr[0] != '0') {
 		ret[setter++] = addr[0];
-		leading=false;
+		leading = false;
 	}
 
 	/* Iterate over string stripping leading zeros
@@ -117,7 +113,7 @@ static char *reduce_v6(char *addr)
 		/* Separate each quartet with a ``:'' */
 		if (r == 0) {
 			ret[setter++] = ':';
-			leading=true;
+			leading = true;
 		}
 
 		/* strip at max 3 leading zeros. Else update Zerocounter */
@@ -131,9 +127,9 @@ static char *reduce_v6(char *addr)
 		}
 
 		/* Reset Zerocounter as necessary */
-		leading=false;
+		leading = false;
 		if (addr[s] != '0') {
-			zeroSeqCount=0;
+			zeroSeqCount = 0;
 		}
 
 		/* Copy chars */
@@ -144,8 +140,9 @@ static char *reduce_v6(char *addr)
 	if (maxZeroSeq > 0) {
 		/* 2x as 0:0:... */
 		char *start = end-maxZeroSeq*2;
-		if (start == ret)
+		if (start == ret) {
 			*start++ = ':';
+		}
 
 		/* Copy chars over to strip 0:0:0... */
 		for (*start++ = ':'; *(end-1); *(start++) = *(end++));
@@ -169,7 +166,7 @@ static char **parse_proc()
 	}
 
 	/* Read each line, split(' ') and add temporary addresses to list */
-	size_t tmpNo=0;
+	size_t tmpNo = 0;
 	while ((read = getline(&lineptr, &size, file)) != -1) {
 		for (int i=0,token=0; i<read; i++) {
 			/* Buffer address */
@@ -180,8 +177,9 @@ static char **parse_proc()
 
 				if (token == 4) {
 					addr[ADDRSIZE] = '\0';
-					if (lineptr[i+2] != '1')
+					if (lineptr[i+2] != '1') {
 						break;
+					}
 
 					/* Found temporary address, convert and add to list */
 					ret[tmpNo++] = reduce_v6(addr);
@@ -204,9 +202,11 @@ static char **parse_proc()
 
 static bool containsAddr(char *needle, char **haystack)
 {
-	for (; *haystack; haystack++)
-		if (strcmp(needle, *haystack) == 0)
+	for (; *haystack; haystack++) {
+		if (strcmp(needle, *haystack) == 0) {
 			return true;
+		}
+	}
 
 	return false;
 }
@@ -228,12 +228,11 @@ static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
 		/* Filter interfaces */
 		if (
 				(ifa->ifa_addr == NULL) ||
-//				(ifa->ifa_flags & IFF_LOOPBACK) ||
-//				(strncmp(ifa->ifa_name, "lo", 3) == 0) ||
 				(options->interface[0] != '\0' &&
 				 strncmp(ifa->ifa_name, options->interface, sizeof options->interface) != 0)
-		   )
+		   ) {
 			continue;
+		}
 
 		/* Only recognize IPv(4|6) */
 		family = ifa->ifa_addr->sa_family;
@@ -250,8 +249,9 @@ static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
 			}
 
 			/* Filter according to options */
-			if ((flags & NTMP) && containsAddr(host, tmps))
+			if ((flags & NTMP) && containsAddr(host, tmps)) {
 				continue;
+			}
 
 			if (
 					(flags == 0) ||
@@ -265,15 +265,17 @@ static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
 					((flags & IPV6) && family == AF_INET6) ||
 					/* Currently GUA is in the range of 2000::/3 2000... - 3fff... */
 					((flags & GUA6) && (*host == '2' || *host == '3'))
-			   ) {
+				) {
 				printf("%s\n", host);
 			}
 		}
 	}
 
-	if (tmps)
-		for (char **t = tmps; *t; t++)
+	if (tmps) {
+		for (char **t = tmps; *t; t++) {
 			free(*t);
+		}
+	}
 	free(tmps);
 }
 
