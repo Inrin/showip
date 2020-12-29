@@ -39,9 +39,26 @@ struct opts {
 
 static void usage()
 {
-	fprintf(stderr, "Usage: showip [-46gltTu] [interface]\n");
+	fprintf(stderr, "Usage: showip [-h] [-46gltTu] [interface]\n");
 
 	exit(EXIT_FAILURE);
+}
+
+static void help()
+{
+	puts(
+      "Usage: showip [-h] [-46gltTu] [interface]\n"
+      "    -h    show this help\n"
+      "    -4    print IPv4 addresses\n"
+      "    -6    print IPv6 addresses (same as -gltu)\n"
+      "    -g    print Global Unique Addresses (GUA)\n"
+      "    -l    print Link-Local Addresses (LLA)\n"
+      "    -t    print temporary addresses\n"
+      "    -T    filter temporary addresses out\n"
+      "    -u    print Unique Local Addresses (ULA)\n"
+      );
+
+	exit(EXIT_SUCCESS);
 }
 
 /* Pretty naïve arg parser */
@@ -58,6 +75,7 @@ static struct opts *parse_flags(int argc, const char **argv)
 		if (*argv[i] == '-') {
 			for (const char *ch = argv[i]+1; *ch; ch++) {
 				switch (*ch) {
+          case 'h': help(); break; /* useless break but you never know */
 					case '4': options->flags |= IPV4; break;
 					case '6': options->flags |= IPV6; break;
 					case 'g': options->flags |= GUA6; break;

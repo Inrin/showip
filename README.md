@@ -3,10 +3,11 @@ Simple tool for displaying current interfaces IP-addresses
 
 # Usage
 ```
-showip [-46gltTu] [interface]
+showip [-h] [-46gltTu] [interface]
 ```
 
 Current options/filters are:
+* **-h** display help
 * **-4** display IPv4 addresses
 * **-6** display IPv6 addresses (Same as -glut)
 * **-g** display GUAs (Global Unicast Addresses)
