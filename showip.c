@@ -65,7 +65,7 @@ static struct opts *parse_flags(int argc, const char **argv)
 					case 't': options->flags |= TMP6; break;
 					case 'T': options->flags |= NTMP; break;
 					case 'u': options->flags |= ULA6; break;
-					default: usage();
+					default: usage(); break; /* useless break but you never know */
 				}
 			}
 		} else {
@@ -81,7 +81,7 @@ static struct opts *parse_flags(int argc, const char **argv)
 static char *reduce_v6(char *addr)
 {
 	char *ret = calloc(ADDRSIZE*2, sizeof *ret);
-	char *ende = NULL;
+	char *end = NULL;
 	bool leading = true;
 	size_t setter = 0;
 	int maxZeroSeq = 0;
@@ -93,7 +93,7 @@ static char *reduce_v6(char *addr)
 		leading=false;
 	}
 
-	/* Iterate over string stripping leading zeros 
+	/* Iterate over string stripping leading zeros
 	 * and calculating maximum zero sequence */
 	for (size_t s=1,r=s%4; s < ADDRSIZE; s++,r=s%4) {
 		/* Separate each quartet with a ``:'' */
@@ -108,7 +108,7 @@ static char *reduce_v6(char *addr)
 				continue;
 			} else if (++zeroSeqCount > maxZeroSeq) {
 				maxZeroSeq = zeroSeqCount;
-				ende = ret+setter+2;
+				end = ret+setter+2;
 			}
 		}
 
@@ -125,12 +125,12 @@ static char *reduce_v6(char *addr)
 	/* Squash multiple zero quartets if needed */
 	if (maxZeroSeq > 0) {
 		/* 2x as 0:0:... */
-		char *start = ende-maxZeroSeq*2;
+		char *start = end-maxZeroSeq*2;
 		if (start == ret)
 			*start++ = ':';
 
 		/* Copy chars over to strip 0:0:0... */
-		for (*start++ = ':'; *(ende-1); *(start++) = *(ende++));
+		for (*start++ = ':'; *(end-1); *(start++) = *(end++));
 	}
 
 	return ret;
@@ -170,7 +170,7 @@ static char **parse_proc()
 
 					break;
 				}
-			}		
+			}
 		}
 	}
 
@@ -209,10 +209,10 @@ static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
 	for (; ifa != NULL; ifa = ifa->ifa_next) {
 		/* Filter interfaces */
 		if (
-				(ifa->ifa_addr == NULL) || 
-				(ifa->ifa_flags & IFF_LOOPBACK) ||
-				(strncmp(ifa->ifa_name, "lo", 3) == 0) ||
-				(options->interface[0] != '\0' && 
+				(ifa->ifa_addr == NULL) ||
+//				(ifa->ifa_flags & IFF_LOOPBACK) ||
+//				(strncmp(ifa->ifa_name, "lo", 3) == 0) ||
+				(options->interface[0] != '\0' &&
 				 strncmp(ifa->ifa_name, options->interface, sizeof options->interface) != 0)
 		   )
 			continue;
@@ -222,8 +222,8 @@ static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
 		if (family == AF_INET || family == AF_INET6) {
 			/* Get human readable address */
 			err = getnameinfo(ifa->ifa_addr,
-					(family == AF_INET) ? sizeof(struct sockaddr_in) 
-					: sizeof(struct sockaddr_in6),
+					(family == AF_INET) ? sizeof(struct sockaddr_in)
+					                    : sizeof(struct sockaddr_in6),
 					host, NI_MAXHOST,
 					NULL, 0, NI_NUMERICHOST);
 			if (err != 0) {
@@ -250,7 +250,7 @@ static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
 			   ) {
 				printf("%s\n", host);
 			}
-		}	
+		}
 	}
 
 	if (tmps)
