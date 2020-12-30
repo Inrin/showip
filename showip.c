@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <ifaddrs.h>
+#include <linux/if_addr.h> /* IFA_F_TEMPORARY */
 
 #include <stdio.h>  /* printing */
 #include <stdlib.h> /* exit/EXIT_* */
@@ -137,7 +138,7 @@ static char *reduce_v6(char *addr)
 	}
 
 	/* Squash multiple zero quartets if needed */
-	if (maxZeroSeq > 0) {
+	if (maxZeroSeq > 1) {
 		/* 2x as 0:0:... */
 		char *start = end-maxZeroSeq*2;
 		if (start == ret) {
@@ -157,8 +158,11 @@ static char **parse_proc()
 	size_t size = 0;
 	ssize_t read = 0;
 	char *lineptr = NULL;
-	char addr[ADDRSIZE];
 
+	char *endptr = NULL;
+	unsigned long interface_flags = 0x0;
+
+	errno = 0;
 	FILE *file = fopen("/proc/net/if_inet6", "r");
 	if (file == NULL) {
 		perror("fopen");
@@ -168,25 +172,19 @@ static char **parse_proc()
 	/* Read each line, split(' ') and add temporary addresses to list */
 	size_t tmpNo = 0;
 	while ((read = getline(&lineptr, &size, file)) != -1) {
-		for (int i=0,token=0; i<read; i++) {
-			/* Buffer address */
-			if (i < ADDRSIZE) {
-				addr[i] = lineptr[i];
-			} else if (isspace((int) lineptr[i])) {
-				token++;
+		errno = 0;
+		interface_flags = strtoul(lineptr+42, &endptr, 16);
+		if (errno != 0) {
+			perror("strtol");
+			exit(EXIT_FAILURE);
+		}
+		if (endptr == lineptr+42) {
+			fprintf(stderr, "No digits were found\n");
+			exit(EXIT_FAILURE);
+		}
 
-				if (token == 4) {
-					addr[ADDRSIZE] = '\0';
-					if (lineptr[i+2] != '1') {
-						break;
-					}
-
-					/* Found temporary address, convert and add to list */
-					ret[tmpNo++] = reduce_v6(addr);
-
-					break;
-				}
-			}
+		if (interface_flags & IFA_F_TEMPORARY) {
+			ret[tmpNo++] = reduce_v6(lineptr);
 		}
 	}
 
@@ -248,25 +246,26 @@ static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
 				exit(EXIT_FAILURE);
 			}
 
-			/* Filter according to options */
-			if ((flags & NTMP) && containsAddr(host, tmps)) {
-				continue;
-			}
-
-			if (
-					(flags == 0) ||
-					(flags == NTMP) ||
-					((flags & IPV4) && family == AF_INET) ||
-					/* -6 equals -gul */
-					((flags & IPV6) && family == AF_INET6) ||
-					((flags & LLv6) && strncmp(host, "fe80", 4) == 0) ||
-					((flags & TMP6) && containsAddr(host, tmps)) ||
-					((flags & ULA6) && strncmp(host, "fd", 2) == 0) ||
-					((flags & IPV6) && family == AF_INET6) ||
-					/* Currently GUA is in the range of 2000::/3 2000... - 3fff... */
-					((flags & GUA6) && (*host == '2' || *host == '3'))
-				) {
-				printf("%s\n", host);
+			if (flags == 0) {
+				puts(host);
+			} else if (family == AF_INET6) {
+				if ((flags & (TMP6|NTMP)) && containsAddr(host, tmps)) {
+					if (flags & TMP6) {
+						puts(host);
+					}
+				} else if (
+						(flags & IPV6) ||
+						/* Currently GUA is in the range of 2000::/3 2000... - 3fff... */
+						((flags & GUA6) && (*host == '2' || *host == '3')) ||
+						((flags & ULA6) && strncmp(host, "fd", 2) == 0) ||
+						((flags & LLv6) && strncmp(host, "fe80", 4) == 0) ||
+						((flags & ULA6) && strncmp(host, "fc", 2) == 0) ||
+						(flags & NTMP)
+					 ) {
+					puts(host);
+				}
+			} else if ((family == AF_INET) && (flags & IPV4)) {
+				puts(host);
 			}
 		}
 	}
@@ -284,6 +283,7 @@ int main(int argc, const char **argv)
 	struct ifaddrs *ifaddr;
 	struct opts *opts = parse_flags(argc, argv);
 
+	errno = 0;
 	if (getifaddrs(&ifaddr) == -1) {
 		perror("getifaddrs");
 		exit(EXIT_FAILURE);
