@@ -110,9 +110,10 @@ static char *reduce_v6(char *addr)
 
 	/* Iterate over string stripping leading zeros
 	 * and calculating maximum zero sequence */
-	for (size_t s=1,r=s%4; s < ADDRSIZE; s++,r=s%4) {
+	for (size_t s=1,r=1; s < ADDRSIZE; s++,r++) {
 		/* Separate each quartet with a ``:'' */
-		if (r == 0) {
+		if (r == 4) {
+			r = 0;
 			ret[setter++] = ':';
 			leading = true;
 		}
