@@ -157,6 +157,47 @@ static void reduce_v6_dont_strip(void **state) {
 	assert_string_equal(reduce_v6("10002000300040005000600070008000"), "1000:2000:3000:4000:5000:6000:7000:8000");
 }
 
+static bool is_Equal_opts(struct opts *a, struct opts *b)
+{
+	return a->flags == b->flags && strcmp(a->interface, b->interface) == 0;
+}
+
+static void parse_flags_none(void **state) {
+	(void) state; /* unused */
+	struct opts *opts = parse_flags(1, NULL);
+	struct opts expected = {0x0, {'\0'}};
+	assert_true(is_Equal_opts(opts, &expected));
+	free(opts);
+}
+
+static void parse_flags_interfacename(void **state) {
+	(void) state; /* unused */
+	struct opts expected = {0, "testdevice"};
+	const char *argv[] = {"showip", "testdevice"};
+	struct opts *opts = parse_flags(sizeof argv / sizeof argv[0], argv);
+	assert_true(is_Equal_opts(opts, &expected));
+	free(opts);
+}
+
+static void parse_flags_all_set(void **state) {
+	(void) state; /* unused */
+	struct opts expected = {IPV4|IPV6|GUA6|LLv6|ULA6|TMP6|NTMP, {'\0'}};
+	const char *argv[] = {"showip", "-46glutT"};
+	struct opts *opts = parse_flags(sizeof argv / sizeof argv[0], argv);
+	assert_true(is_Equal_opts(opts, &expected));
+	free(opts);
+}
+
+static void parse_flags_ipv6_set(void **state) {
+	(void) state; /* unused */
+	struct opts expected = {IPV6, {'\0'}};
+	const char *argv[] = {"showip", "-6"};
+	struct opts *opts = parse_flags(sizeof argv / sizeof argv[0], argv);
+	assert_true(is_Equal_opts(opts, &expected));
+	free(opts);
+}
+
+
 int main(void) {
 	const struct CMUnitTest reduce_v6_tests[] = {
 		cmocka_unit_test(reduce_v6_full),
@@ -176,5 +217,18 @@ int main(void) {
 		cmocka_unit_test(reduce_v6_leading_zeros),
 		cmocka_unit_test(reduce_v6_dont_strip),
 	};
-	return cmocka_run_group_tests(reduce_v6_tests, NULL, NULL);
+
+	const struct CMUnitTest parse_flags_tests[] = {
+		cmocka_unit_test(parse_flags_none),
+		cmocka_unit_test(parse_flags_interfacename),
+		cmocka_unit_test(parse_flags_all_set),
+		cmocka_unit_test(parse_flags_ipv6_set),
+	};
+
+	int ret = 0;
+	puts("reduce_v6");
+	ret = cmocka_run_group_tests(reduce_v6_tests, NULL, NULL);
+	puts("\nparse_flags");
+	ret = cmocka_run_group_tests_name("parse_flags", parse_flags_tests, NULL, NULL);
+	return ret;
 }
