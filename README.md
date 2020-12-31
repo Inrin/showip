@@ -21,7 +21,7 @@ Current options/filters are:
 Just run your preferred compiler:
 ```
 gcc -Wall -o showip main.c
-clang -Weverything -o showip main.c
+clang -Wall -o showip main.c
 ```
 
 # Testing

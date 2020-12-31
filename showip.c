@@ -1,20 +1,20 @@
-#define _GNU_SOURCE     /* To get defns of NI_MAXSERV and NI_MAXHOST */
-/* gai_strerror */
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
 #include <ifaddrs.h>
 #include <linux/if_addr.h> /* IFA_F_TEMPORARY */
 
-#include <stdio.h>  /* printing */
-#include <stdlib.h> /* exit/EXIT_* */
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h> /* strncmp */
-#include <errno.h>
 #include <ctype.h> /* isspace */
 #include <stdbool.h>
+#include <errno.h>
+
+/* needs _GNU_SOURCE */
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #define ADDRSIZE 32
-#define MAXLEN 256
+#define MAX_NO_ELEMENTS 256
 
 enum ARGFLAGS {
 	IPV4 = 1<<0,
@@ -34,6 +34,7 @@ struct opts {
 	char interface[256];
 };
 
+__attribute__((noreturn))
 static void usage()
 {
 	fprintf(stderr, "Usage: showip [-h] [-46gltTu] [interface]\n");
@@ -41,6 +42,7 @@ static void usage()
 	exit(EXIT_FAILURE);
 }
 
+__attribute__((noreturn))
 static void help()
 {
 	puts(
@@ -62,7 +64,12 @@ static void help()
 /* struct opts has to be freed */
 static struct opts *parse_flags(int argc, const char **argv)
 {
+	errno = 0;
 	struct opts *options = malloc(sizeof *options);
+	if (options == NULL) {
+		perror("malloc");
+		exit(EXIT_FAILURE);
+	}
 	*options = (struct opts) {0, {'\0'}};
 
 	if (argc < 2)
@@ -95,32 +102,45 @@ static struct opts *parse_flags(int argc, const char **argv)
 
 static char *reduce_v6(char *addr)
 {
-	char *ret = calloc(ADDRSIZE*2, sizeof *ret);
+	char *ret = NULL;
 	char *end = NULL;
 	bool leading = true;
 	size_t setter = 0;
 	int maxZeroSeq = 0;
 	int zeroSeqCount = 0;
+	size_t step = 0;
+
+	if (addr == NULL) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	errno = 0;
+	ret = calloc(ADDRSIZE*2, sizeof *ret);
+	if (ret == NULL) {
+		return NULL;
+	}
+
 
 	/* Special case of first quartet */
-	if (addr[0] != '0') {
+	if (addr[step++] != '0') {
 		ret[setter++] = addr[0];
 		leading = false;
 	}
 
 	/* Iterate over string stripping leading zeros
 	 * and calculating maximum zero sequence */
-	for (size_t s=1,r=1; s < ADDRSIZE; s++,r++) {
+	for (size_t round=1; step < ADDRSIZE && addr[step]; step++,round++) {
 		/* Separate each quartet with a ``:'' */
-		if (r == 4) {
-			r = 0;
+		if (round == 4) {
+			round = 0;
 			ret[setter++] = ':';
 			leading = true;
 		}
 
 		/* strip at max 3 leading zeros. Else update Zerocounter */
-		if (leading && addr[s] == '0') {
-			if (r != 3) {
+		if (leading && addr[step] == '0') {
+			if (round != 3) {
 				continue;
 			} else if (++zeroSeqCount > maxZeroSeq) {
 				maxZeroSeq = zeroSeqCount;
@@ -130,12 +150,16 @@ static char *reduce_v6(char *addr)
 
 		/* Reset Zerocounter as necessary */
 		leading = false;
-		if (addr[s] != '0') {
+		if (addr[step] != '0') {
 			zeroSeqCount = 0;
 		}
 
 		/* Copy chars */
-		ret[setter++] = addr[s];
+		ret[setter++] = addr[step];
+	}
+	if (step != ADDRSIZE) {
+		errno = EINVAL;
+		return NULL;
 	}
 
 	/* Squash multiple zero quartets if needed */
@@ -153,15 +177,22 @@ static char *reduce_v6(char *addr)
 	return ret;
 }
 
-static char **parse_proc()
+static const char **parse_proc()
 {
-	char **ret = malloc(MAXLEN * sizeof(char *));
+	const char **ret = NULL;
 	size_t size = 0;
 	ssize_t read = 0;
 	char *lineptr = NULL;
 
 	char *endptr = NULL;
 	unsigned long interface_flags = 0x0;
+
+	errno = 0;
+	ret = malloc(MAX_NO_ELEMENTS * sizeof(char *));
+	if (ret == NULL) {
+		perror("malloc");
+		exit(EXIT_FAILURE);
+	}
 
 	errno = 0;
 	FILE *file = fopen("/proc/net/if_inet6", "r");
@@ -199,8 +230,12 @@ static char **parse_proc()
 }
 
 
-static bool containsAddr(char *needle, char **haystack)
+static bool containsAddr(const char *needle, const char **haystack)
 {
+	if (haystack == NULL) {
+		return needle == NULL;
+	}
+
 	for (; *haystack; haystack++) {
 		if (strcmp(needle, *haystack) == 0) {
 			return true;
@@ -210,12 +245,12 @@ static bool containsAddr(char *needle, char **haystack)
 	return false;
 }
 
-static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
+static void print_filtered(const struct ifaddrs *ifa, const struct opts *options)
 {
 	int family, err;
-	int flags = options->flags;
+	const int flags = options->flags;
 	char host[NI_MAXHOST];
-	char **tmps = NULL;
+	const char **tmps = NULL;
 
 	if (options->flags & TMP6 || options->flags & NTMP) {
 		tmps = parse_proc();
@@ -272,8 +307,8 @@ static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
 	}
 
 	if (tmps) {
-		for (char **t = tmps; *t; t++) {
-			free(*t);
+		for (const char **t = tmps; *t; t++) {
+			free((char *)*t);
 		}
 	}
 	free(tmps);
