@@ -20,8 +20,15 @@ Current options/filters are:
 # Building
 Just run your preferred compiler:
 ```
-gcc -o showip showip.c
-clang -o showip showip.c
+gcc -Wall -o showip main.c
+clang -Weverything -o showip main.c
+```
+
+# Testing
+To compile the tests, [cmocka](https://cmocka.org/) must be present.
+```
+gcc -Wall -o runtest test.c `pkg-config --cflags --libs cmocka` && ./runtest
+clang -Weverything -o runtest test.c `pkg-config --cflags --libs cmocka` && ./runtest
 ```
 
 # Installing

@@ -147,7 +147,7 @@ static char *reduce_v6(char *addr)
 		}
 
 		/* Copy chars over to strip 0:0:0... */
-		for (*start++ = ':'; *(end-1); *(start++) = *(end++));
+		for (*start++ = ':'; *(end-2); *(start++) = *(end++));
 	}
 
 	return ret;
@@ -277,22 +277,4 @@ static void print_filtered(const struct ifaddrs *ifa, struct opts *options)
 		}
 	}
 	free(tmps);
-}
-
-int main(int argc, const char **argv)
-{
-	struct ifaddrs *ifaddr;
-	struct opts *opts = parse_flags(argc, argv);
-
-	errno = 0;
-	if (getifaddrs(&ifaddr) == -1) {
-		perror("getifaddrs");
-		exit(EXIT_FAILURE);
-	}
-
-	print_filtered(ifaddr, opts);
-
-	freeifaddrs(ifaddr);
-	free(opts);
-	exit(EXIT_SUCCESS);
 }
